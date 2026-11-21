@@ -28,7 +28,7 @@ lands in Cloud Object Storage with no upload step.
    writable, write the report there; remove the COS upload block.
 2. `Dockerfile`: drop the `cos` plugin install.
 3. `deploy.sh`: `ibmcloud ce job create/update` with
-   `--mount-data-store /mnt/reports=ce-pds-9ef3:/cleanup`; API key from a secret.
+   `--mount-data-store /mnt/reports=ce-pds-9ef3:cleanup`; API key from a secret.
 
 ## Builder's calls
 - Mount path `/mnt/reports`; overridable via `REPORT_DIR`.

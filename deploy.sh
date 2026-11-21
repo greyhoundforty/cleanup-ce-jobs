@@ -17,7 +17,7 @@ set -euo pipefail
 
 JOB_NAME="weekly-cleanup"
 SECRET_NAME="cleanup-api-key"
-MOUNT="/mnt/reports=ce-pds-9ef3:/cleanup"
+MOUNT="/mnt/reports=ce-pds-9ef3:cleanup"
 
 ibmcloud ce project select --name "$CE_PROJECT"
 
