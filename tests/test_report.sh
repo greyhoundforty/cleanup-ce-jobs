@@ -104,11 +104,41 @@ test_search_failure_fails() {
     fi
 }
 
+test_failed_rerun_keeps_existing_report() {
+    local dir="$TMP/t6"
+    mkdir -p "$dir"
+    make_stub "$ITEMS" 0
+    run_script "$dir"
+    make_stub '' 1
+    run_script "$dir"
+    local f
+    f=$(ls "$dir"/cleanup_report_*.txt 2>/dev/null | head -1)
+    if [ "$RC" -ne 0 ] && [ -n "$f" ] && grep -q 'vm1' "$f" && ! ls "$dir"/*.tmp >/dev/null 2>&1; then
+        check failed_rerun_keeps_existing_report ok
+    else
+        check failed_rerun_keeps_existing_report fail
+    fi
+}
+
+test_default_dir_requires_mount() {
+    make_stub "$ITEMS" 0
+    ERR="$TMP/stderr"
+    env -u REPORT_DIR PATH="$TMP/bin:$PATH" bash "$SCRIPT" >"$TMP/stdout" 2>"$ERR"
+    RC=$?
+    if [ "$RC" -ne 0 ] && grep -q 'not mounted' "$ERR"; then
+        check default_dir_requires_mount ok
+    else
+        check default_dir_requires_mount fail
+    fi
+}
+
 test_writes_report_in_report_dir
 test_creates_missing_dir
 test_unwritable_dir_fails
 test_no_results_leaves_no_file
 test_search_failure_fails
+test_failed_rerun_keeps_existing_report
+test_default_dir_requires_mount
 
 echo "${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
