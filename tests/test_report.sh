@@ -113,7 +113,8 @@ test_failed_rerun_keeps_existing_report() {
     run_script "$dir"
     local f
     f=$(ls "$dir"/cleanup_report_*.txt 2>/dev/null | head -1)
-    if [ "$RC" -ne 0 ] && [ -n "$f" ] && grep -q 'vm1' "$f" && ! ls "$dir"/*.tmp >/dev/null 2>&1; then
+    if [ "$RC" -ne 0 ] && [ -n "$f" ] && grep -q 'vm1' "$f" && ! ls "$dir"/*.tmp >/dev/null 2>&1 \
+        && [ -n "$(report "$dir" json)" ] && [ -n "$(report "$dir" csv)" ]; then
         check failed_rerun_keeps_existing_report ok
     else
         check failed_rerun_keeps_existing_report fail
@@ -132,6 +133,92 @@ test_default_dir_requires_mount() {
     fi
 }
 
+ITEMS2='{"items":[
+ {"name":"vm1","region":"ca-tor","service_name":"is","type":"resource-instance","resource_group_id":"rg1","creation_date":"2026-01-02T03:04:05Z","tags":["owner:ryantiffany","deleteme"],"crn":"crn:v1:abc"},
+ {"name":"a, \"b\"","service_name":"kms","type":"key","crn":"crn:v1:def"}]}'
+
+CSV_HEADER='delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn'
+
+# report <dir> <ext>: path of the report with that extension, or empty.
+report() { ls "$1"/cleanup_report_*."$2" 2>/dev/null | head -1; }
+
+test_writes_all_three_formats() {
+    local dir="$TMP/t8"
+    mkdir -p "$dir"
+    make_stub "$ITEMS2" 0
+    run_script "$dir"
+    local t j c
+    t=$(report "$dir" txt); j=$(report "$dir" json); c=$(report "$dir" csv)
+    if [ "$RC" -eq 0 ] && [ -n "$t" ] && [ -n "$j" ] && [ -n "$c" ] \
+        && grep -q 'vm1 | ca-tor | is | crn:v1:abc' "$t"; then
+        check writes_all_three_formats ok
+    else
+        check writes_all_three_formats fail
+    fi
+}
+
+test_csv_header_and_rows() {
+    local dir="$TMP/t9"
+    mkdir -p "$dir"
+    make_stub "$ITEMS2" 0
+    run_script "$dir"
+    local c
+    c=$(report "$dir" csv)
+    if [ "$RC" -eq 0 ] && [ -n "$c" ] \
+        && [ "$(sed -n 1p "$c")" = "$CSV_HEADER" ] \
+        && [ "$(sed -n 2p "$c")" = '"no","vm1","is","resource-instance","ca-tor","rg1","2026-01-02T03:04:05Z","owner:ryantiffany;deleteme","crn:v1:abc"' ] \
+        && [ "$(sed -n 3p "$c")" = '"no","a, ""b""","kms","key","","","","","crn:v1:def"' ] \
+        && [ "$(wc -l < "$c" | tr -d ' ')" = 3 ]; then
+        check csv_header_and_rows ok
+    else
+        check csv_header_and_rows fail
+    fi
+}
+
+test_json_matches_items() {
+    local dir="$TMP/t10"
+    mkdir -p "$dir"
+    make_stub "$ITEMS2" 0
+    run_script "$dir"
+    local j
+    j=$(report "$dir" json)
+    if [ "$RC" -eq 0 ] && [ -n "$j" ] \
+        && [ "$(jq -S . "$j")" = "$(echo "$ITEMS2" | jq -S .items)" ]; then
+        check json_matches_items ok
+    else
+        check json_matches_items fail
+    fi
+}
+
+test_non_json_output_fails() {
+    local dir="$TMP/t11"
+    mkdir -p "$dir"
+    make_stub 'not json' 0
+    run_script "$dir"
+    if [ "$RC" -ne 0 ] && [ -z "$(ls -A "$dir")" ]; then
+        check non_json_output_fails ok
+    else
+        check non_json_output_fails fail
+    fi
+}
+
+test_rerun_replaces_all_three() {
+    local dir="$TMP/t12"
+    mkdir -p "$dir"
+    make_stub "$ITEMS" 0
+    run_script "$dir"
+    make_stub "$ITEMS2" 0
+    run_script "$dir"
+    local t j c
+    t=$(report "$dir" txt); j=$(report "$dir" json); c=$(report "$dir" csv)
+    if [ "$RC" -eq 0 ] && [ -n "$c" ] && [ "$(wc -l < "$c" | tr -d ' ')" = 3 ] \
+        && [ "$(jq length "$j")" = 2 ] && grep -q 'crn:v1:def' "$t"; then
+        check rerun_replaces_all_three ok
+    else
+        check rerun_replaces_all_three fail
+    fi
+}
+
 test_writes_report_in_report_dir
 test_creates_missing_dir
 test_unwritable_dir_fails
@@ -139,6 +226,11 @@ test_no_results_leaves_no_file
 test_search_failure_fails
 test_failed_rerun_keeps_existing_report
 test_default_dir_requires_mount
+test_writes_all_three_formats
+test_csv_header_and_rows
+test_json_matches_items
+test_non_json_output_fails
+test_rerun_replaces_all_three
 
 echo "${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
