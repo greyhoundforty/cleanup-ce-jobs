@@ -21,8 +21,8 @@ RUN chmod +x /usr/local/bin/weekly_cleanup_report.sh
 # Set the working directory
 WORKDIR /home/app
 
-# Wrapper entrypoint to handle non-interactive login and execute the script
-# We add --non-interactive to the login to prevent hanging on prompts
-RUN echo '#!/bin/bash\n/usr/local/bin/ibmcloud login --apikey "$IBMCLOUD_API_KEY" -q > /dev/null 2>&1\n/usr/local/bin/weekly_cleanup_report.sh' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+# Entrypoint: non-interactive login (fails fast with a clear error), then the report
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
