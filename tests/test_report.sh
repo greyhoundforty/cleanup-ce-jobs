@@ -107,7 +107,10 @@ test_empty_rerun_replaces_earlier_report() {
     run_script "$dir"
     local t c
     t=$(report "$dir" txt); c=$(report "$dir" csv)
-    if [ "$RC" -eq 0 ] && [ "$(wc -l < "$c" | tr -d ' ')" = 1 ] && grep -q 'No resources found' "$t"; then
+    local j
+    j=$(report "$dir" json)
+    if [ "$RC" -eq 0 ] && [ "$(cat "$c")" = "$CSV_HEADER" ] && grep -q 'No resources found' "$t" \
+        && [ "$(jq -c . "$j")" = '[]' ]; then
         check empty_rerun_replaces_earlier_report ok
     else
         check empty_rerun_replaces_earlier_report fail
@@ -241,6 +244,34 @@ test_rerun_replaces_all_three() {
     fi
 }
 
+test_failed_csv_move_leaves_no_mixed_set() {
+    local dir="$TMP/t14"
+    mkdir -p "$dir" "$TMP/mvbin"
+    make_stub "$ITEMS" 0
+    run_script "$dir"
+    # mv that fails only when moving the CSV into place
+    cat > "$TMP/mvbin/mv" <<'EOF'
+#!/bin/bash
+case "${@: -1}" in *.csv) exit 1 ;; esac
+exec /bin/mv "$@"
+EOF
+    chmod +x "$TMP/mvbin/mv"
+    make_stub "$ITEMS2" 0
+    ERR="$TMP/stderr"
+    PATH="$TMP/mvbin:$TMP/bin:$PATH" REPORT_DIR="$dir" bash "$SCRIPT" >"$TMP/stdout" 2>"$ERR"
+    RC=$?
+    local c
+    c=$(report "$dir" csv)
+    # The earlier CSV survives intact; no newer txt/json sits beside it.
+    if [ "$RC" -ne 0 ] && [ "$(wc -l < "$c" | tr -d ' ')" = 2 ] \
+        && [ -z "$(report "$dir" txt)" ] && [ -z "$(report "$dir" json)" ] \
+        && ! ls "$dir"/*.tmp >/dev/null 2>&1; then
+        check failed_csv_move_leaves_no_mixed_set ok
+    else
+        check failed_csv_move_leaves_no_mixed_set fail
+    fi
+}
+
 test_writes_report_in_report_dir
 test_creates_missing_dir
 test_unwritable_dir_fails
@@ -254,6 +285,7 @@ test_json_matches_items
 test_non_json_output_fails
 test_rerun_replaces_all_three
 test_empty_rerun_replaces_earlier_report
+test_failed_csv_move_leaves_no_mixed_set
 
 echo "${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

@@ -66,7 +66,10 @@ delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn
 **All-or-nothing write**: the search runs once into memory/a temp file; each format
 renders to `<file>.tmp`; only if all three renders succeed are they `mv -f`'d into
 place. On any failure every `.tmp` is removed, existing reports are untouched, and
-the script exits non-zero.
+the script exits non-zero. On the COS-backed mount `mv` is copy + delete, so the
+three moves are not atomic as a set: the CSV moves last, and if any move fails the
+files this run already replaced are removed, so a newer txt/json never sits beside
+an older CSV (the earlier CSV survives intact).
 
 **Empty result** (behavior change; previously no file): write all three files.
 JSON is `[]`, CSV is the header row only, text contains

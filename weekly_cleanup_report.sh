@@ -64,8 +64,19 @@ if ! { jq -r --arg tag "$TAG" 'if (.items | length) == 0 then "No resources foun
     exit 1
 fi
 
-mv -f "${TXT_FILE}.tmp" "$TXT_FILE" \
-    && mv -f "${JSON_FILE}.tmp" "$JSON_FILE" \
-    && mv -f "${CSV_FILE}.tmp" "$CSV_FILE" || { echo "ERROR: report write failed." >&2; cleanup_tmp; exit 1; }
+# On a COS-backed mount each mv is a copy + delete, so the three moves cannot be
+# atomic as a set. The CSV (the file a cleanup run consumes) moves last; if any
+# move fails, remove the files this run already replaced so a newer txt/json
+# never sits beside an older CSV.
+MOVED=()
+for f in "$TXT_FILE" "$JSON_FILE" "$CSV_FILE"; do
+    if ! mv -f "${f}.tmp" "$f"; then
+        echo "ERROR: report write failed." >&2
+        rm -f "${MOVED[@]}"
+        cleanup_tmp
+        exit 1
+    fi
+    MOVED+=("$f")
+done
 rm -f "$SEARCH_TMP"
 echo "Report generated successfully: ${BASE}.{txt,json,csv}"
