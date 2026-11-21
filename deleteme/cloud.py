@@ -4,6 +4,8 @@ import json
 import subprocess
 from dataclasses import dataclass
 
+from deleteme.protect import crn_key
+
 
 class CloudError(Exception):
     """An ibmcloud command failed or returned unusable output."""
@@ -66,6 +68,10 @@ class Cloud:
         if not items:
             return None
         it = items[0]
+        if crn_key(it.get("crn") or "") != crn_key(crn):
+            raise CloudError(
+                f"resource search returned a different resource: {it.get('crn')}"
+            )
         parts = (it.get("crn") or crn).split(":") + [""] * 10
         resource_id = it.get("resource_id") or parts[9] or parts[7]
         return Resource(
@@ -83,7 +89,15 @@ class Cloud:
             self._region = region
 
     def _subnets(self, vpc_id: str) -> list[dict]:
-        return self._json("is", "subnets", "--vpc", vpc_id, "--output", "JSON")
+        return self._json(
+            "is",
+            "subnets",
+            "--vpc",
+            vpc_id,
+            "--all-resource-groups",
+            "--output",
+            "JSON",
+        )
 
     def _gateways(self, vpc_id: str) -> list[dict]:
         gws = self._json(
@@ -118,13 +132,21 @@ class Cloud:
         blockers = []
         for s in subnets:
             for ip in self._json("is", "subnet-reserved-ips", s.id, "--output", "JSON"):
-                if ip.get("owner") == "user":
+                # Anything attached to an address (instances, load balancers, VPN and
+                # endpoint gateways) blocks; IBM's own network addresses have no target.
+                if ip.get("owner") == "user" or ip.get("target"):
                     what = (ip.get("target") or {}).get("resource_type") or ip.get(
                         "name", "?"
                     )
                     blockers.append(f"subnet {s.name}: attached {what}")
         for sg in self._json(
-            "is", "security-groups", "--vpc", vpc_id, "--output", "JSON"
+            "is",
+            "security-groups",
+            "--vpc",
+            vpc_id,
+            "--all-resource-groups",
+            "--output",
+            "JSON",
         ):
             if sg.get("id") != default_sg:
                 blockers.append(f"security group {sg.get('name')}")

@@ -127,3 +127,30 @@ def test_non_json_raises(stub):
     stub.set([("resource search", "not json")])
     with pytest.raises(CloudError):
         Cloud().lookup("crn:x")
+
+
+def test_lookup_crn_mismatch_raises(stub):
+    asked = vpc_crn(VPC_A)
+    other = vpc_crn("r038-other")
+    stub.set([search(asked, item("other", "vpc", other, BOTH))])
+    with pytest.raises(CloudError, match="different resource"):
+        Cloud().lookup(asked)
+
+
+def test_lists_span_all_resource_groups(stub):
+    stub.set(vpc_entries(VPC_A, subnets=[(SN_A, "s", "")]))
+    Cloud().vpc_children(VPC_A)
+    for c in stub.calls():
+        if c[1] in ("subnets", "security-groups", "public-gateways", "network-acls"):
+            assert "--all-resource-groups" in c, c
+
+
+def test_provider_owned_attached_ip_is_blocker(stub):
+    lb = {
+        "name": "lb-ip",
+        "owner": "provider",
+        "target": {"resource_type": "load_balancer"},
+    }
+    stub.set(vpc_entries(VPC_A, subnets=[(SN_A, "s", "")], reserved={SN_A: [lb]}))
+    b = Cloud().vpc_children(VPC_A).blockers
+    assert len(b) == 1 and "load_balancer" in b[0]

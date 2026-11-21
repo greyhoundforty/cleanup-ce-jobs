@@ -302,3 +302,32 @@ def test_targets_vpc_region(stub):
     calls = stub.calls()
     first_is = next(i for i, c in enumerate(calls) if c[0] == "is")
     assert ["target", "-r", "us-south", "-q"] in calls[:first_is]
+
+
+def test_unfindable_child_blocks_vpc(stub):
+    vpc_scenario(stub)
+    stub.add(*search(subnet_crn(SN)))  # listed by `is`, but search cannot find it yet
+    stub.set([(e["match"], Seq(e["responses"])) for e in reversed(stub.entries)])
+    ev = go(rows(("yes", vpc_crn(VPC))), dry_run=False)
+    assert outcomes(ev) == [("SKIP_CHILD", "vpc-a")] and "a-sn" in ev[0].reason
+    assert deletes(stub) == []
+
+
+def test_child_without_crn_blocks_vpc(stub):
+    vpc_scenario(stub)
+    no_crn = [{"id": SN, "name": "a-sn", "public_gateway": None}]
+    stub.set(
+        [(f"is subnets --vpc {VPC}", no_crn)]
+        + [(e["match"], Seq(e["responses"])) for e in stub.entries]
+    )
+    ev = go(rows(("yes", vpc_crn(VPC))), dry_run=False)
+    assert ev[0].outcome == "SKIP_CHILD" and "a-sn" in ev[0].reason
+    assert deletes(stub) == []
+
+
+def test_lookup_of_other_resource_fails(stub):
+    asked = project_crn(PROJ)
+    stub.set([search(asked, item("cos", "resource-instance", RST_COS, BOTH))])
+    ev = go(rows(("yes", asked)), dry_run=False)
+    assert ev[0].outcome == "FAILED"
+    assert deletes(stub) == []

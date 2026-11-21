@@ -37,3 +37,16 @@ def test_unrelated_not_protected():
         "d6095178-b1de-4861-898a-cd0035a2b236::"
     )
     assert not is_protected(proj, build_protected({}))
+
+
+def test_bucket_crn_protects_its_instance():
+    bucket = (
+        "crn:v1:bluemix:public:cloud-object-storage:global:a/x:inst-1:bucket:review-bkt"
+    )
+    p = build_protected({"PROTECTED_CRNS": bucket})
+    assert is_protected(
+        "crn:v1:bluemix:public:cloud-object-storage:global:a/x:inst-1::", p
+    )
+    assert not is_protected(
+        "crn:v1:bluemix:public:cloud-object-storage:global:a/x:inst-2::", p
+    )

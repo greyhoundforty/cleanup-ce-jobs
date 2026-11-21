@@ -44,6 +44,7 @@ REVIEW_MOUNT="${REVIEW_DIR}=${PDS_NAME}"
 DRY_RUN_VALUE="true"
 [ "${DELETEME_DRY_RUN:-true}" = "false" ] && DRY_RUN_VALUE="false"
 
+# Failed runs are not retried automatically (--retrylimit 0): read the log, re-upload.
 ENV_ARGS=(--env "CLEANUP_SCRIPT=/opt/cleanup/deleteme_cleanup.py"
           --env "DRY_RUN=${DRY_RUN_VALUE}"
           --env "PROTECTED_CRNS=${PROTECTED_CRNS:-}")
@@ -78,7 +79,7 @@ if ibmcloud ce job get --name "$JOB_NAME" >/dev/null 2>&1; then
     HAS_SECRET=$(echo "$JOB_JSON" | jq -r --arg s "$SECRET_NAME" \
         '[.spec.template.containers[0].envFrom[]?.secretRef.name | select(. == $s)] | length')
 
-    UPDATE_ARGS=(--image "$IMAGE" --registry-secret "$REGISTRY_SECRET" "${ENV_ARGS[@]}")
+    UPDATE_ARGS=(--image "$IMAGE" --registry-secret "$REGISTRY_SECRET" --retrylimit 0 "${ENV_ARGS[@]}")
     [ "$(has_mount "$REPORTS_DIR")" = "0" ] && UPDATE_ARGS+=(--mount-data-store "$REPORTS_MOUNT")
     [ "$(has_mount "$REVIEW_DIR")" = "0" ] && UPDATE_ARGS+=(--mount-data-store "$REVIEW_MOUNT")
     [ "$HAS_SECRET" = "0" ] && UPDATE_ARGS+=(--env-from-secret "$SECRET_NAME")
@@ -87,6 +88,7 @@ else
     ibmcloud ce job create --name "$JOB_NAME" \
         --image "$IMAGE" \
         --registry-secret "$REGISTRY_SECRET" \
+        --retrylimit 0 \
         --mount-data-store "$REPORTS_MOUNT" \
         --mount-data-store "$REVIEW_MOUNT" \
         --env-from-secret "$SECRET_NAME" \

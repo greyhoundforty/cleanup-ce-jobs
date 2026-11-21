@@ -179,6 +179,21 @@ test_never_touches_weekly_job() {
     fi
 }
 
+test_no_automatic_retries() {
+    job_json 0 0
+    run_deploy 0
+    local created; created=$(jobcall)
+    job_json 1 1
+    run_deploy 1
+    local updated; updated=$(jobcall)
+    if echo "$created" | grep -q -- "--retrylimit 0" && echo "$updated" | grep -q -- "--retrylimit 0"; then
+        check no_automatic_retries ok
+    else
+        check no_automatic_retries fail
+    fi
+}
+
+test_no_automatic_retries
 test_requires_env
 test_create_sets_mounts_secret_env
 test_api_key_not_on_command_line

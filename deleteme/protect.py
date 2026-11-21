@@ -19,9 +19,22 @@ def crn_key(crn: str) -> tuple[str, str, str, str]:
     return (parts[4], parts[7], parts[8], parts[9])
 
 
+def _protect_key(crn: str) -> tuple[str, str, str, str]:
+    """Service instances match on the instance alone (a bucket CRN protects its COS
+    instance); instance-less CRNs (VPC resources) match on the full resource."""
+    service, instance, rtype, resource = crn_key(crn)
+    return (
+        (service, instance, "", "")
+        if instance
+        else (service, instance, rtype, resource)
+    )
+
+
 def build_protected(env: Mapping[str, str]) -> frozenset[tuple[str, str, str, str]]:
-    keys = {crn_key(c) for c in BUILTIN_PROTECTED}
-    keys |= {crn_key(c) for c in env.get("PROTECTED_CRNS", "").split(",") if c.strip()}
+    keys = {_protect_key(c) for c in BUILTIN_PROTECTED}
+    keys |= {
+        _protect_key(c) for c in env.get("PROTECTED_CRNS", "").split(",") if c.strip()
+    }
     project = env.get("CE_PROJECT_ID", "").strip().lower()
     if project:
         keys.add(("codeengine", project, "", ""))
@@ -29,4 +42,4 @@ def build_protected(env: Mapping[str, str]) -> frozenset[tuple[str, str, str, st
 
 
 def is_protected(crn: str, protected: frozenset) -> bool:
-    return crn_key(crn) in protected
+    return _protect_key(crn) in protected

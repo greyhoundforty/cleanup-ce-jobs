@@ -75,6 +75,11 @@ class _Run:
         if res is None:
             self.emit(ALREADY_GONE, row.type, row.name, row.crn, "not found")
             return
+        if is_protected(res.crn, self.protected):
+            self.emit(
+                SKIP_PROTECTED, res.type, res.name, res.crn, "on the protected list"
+            )
+            return
         missing = _missing_tags(res.tags)
         if missing:
             self.emit(
@@ -113,11 +118,14 @@ class _Run:
         label = f"{child.kind} {child.name}"
         if is_protected(child.crn, self.protected):
             return [f"{label} is protected"]
+        if not child.crn:
+            return [f"{label} has no CRN, so its tags cannot be checked"]
         if crn_key(child.crn) in explicit_no:
             return [f"{label} is marked no"]
         found = self.cloud.lookup(child.crn)
         if found is None:
-            return []
+            # It was just listed, so it exists; search cannot vouch for its tags yet.
+            return [f"{label} not found by search, so its tags cannot be checked"]
         missing = _missing_tags(found.tags)
         return [f"{label} missing tag(s): {', '.join(missing)}"] if missing else []
 
