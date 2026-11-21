@@ -11,7 +11,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install IBM Cloud CLI
-RUN curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+# The installer puts the binary in /usr/local/bin/ibmcloud by default
+RUN curl -sS https://msp.ibm.com/installer/install.sh | bash
+
+# No need to install 'resource-controller' as 'ibmcloud resource' is native.
+# We just ensure we have the 'cos' plugin for the upload.
+RUN ibmcloud plugin install cos
 
 # Copy the cleanup script into the image
 COPY weekly_cleanup_report.sh /usr/local/bin/weekly_cleanup_report.sh
@@ -20,7 +25,8 @@ RUN chmod +x /usr/local/bin/weekly_cleanup_report.sh
 # Set the working directory
 WORKDIR /home/app
 
-# Create a wrapper entrypoint to handle login and then run the script
-RUN echo '#!/bin/bash\n/usr/local/bin/ibmcloud login --apikey "IBMCLOUD_API_KEY"\n/usr/local/bin/weekly_cleanup_report.sh' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+# Wrapper entrypoint to handle non-interactive login and execute the script
+# We add --non-interactive to the login to prevent hanging on prompts
+RUN echo '#!/bin/bash\nibmcloud login --apikey "$IBMCLOUD_API_KEY" --non-interactive\n/usr/local/bin/weekly_cleanup_report.sh' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
