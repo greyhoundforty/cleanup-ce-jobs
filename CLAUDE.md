@@ -75,6 +75,7 @@ Safety rules (do not weaken): delete only `yes` rows whose LIVE resource has bot
 `CE_PROJECT_ID` and `PROTECTED_CRNS`), and only when `DRY_RUN` is exactly `false`. VPC `yes`
 cascades only through subnets/gateways that carry both tags; any untagged, protected, `no`-marked
 child or attached resource blocks the whole VPC. Service instances go to reclamation.
+A CRN marked `yes` on one row and `no` on another is skipped (`SKIP_CONFLICT`).
 
 ## Deferred minors (from final review)
 - Deferred minors from the #1 review (M1-M8) are listed in PR #3

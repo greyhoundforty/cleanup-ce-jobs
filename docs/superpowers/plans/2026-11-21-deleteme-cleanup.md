@@ -19,7 +19,7 @@
   - `crn:v1:bluemix:public:codeengine:ca-tor:a/db1a8b544a184fd7ac339c243684a9b7:661a5a9d-20c7-435c-af3b-a68806e905ea::` (`rst-ce-demo`)
   - `crn:v1:bluemix:public:cloud-object-storage:global:a/db1a8b544a184fd7ac339c243684a9b7:4c2b8b6a-2217-422b-ad57-e48380ae1ba4::` (`rst-cos-instance`)
   - plus the project named by `CE_PROJECT_ID`, plus comma-separated `PROTECTED_CRNS`.
-- Outcomes, exactly: `DELETED`, `WOULD_DELETE`, `ALREADY_GONE`, `SKIP_TAGS`, `SKIP_PROTECTED`, `SKIP_CHILD`, `SKIP_UNSUPPORTED`, `SKIP_NO_CRN`, `FAILED`.
+- Outcomes, exactly: `DELETED`, `WOULD_DELETE`, `ALREADY_GONE`, `SKIP_TAGS`, `SKIP_PROTECTED`, `SKIP_CHILD`, `SKIP_UNSUPPORTED`, `SKIP_NO_CRN`, `SKIP_CONFLICT`, `FAILED`.
 - Service instances: `ibmcloud resource service-instance-delete <crn> --recursive -f`; never `reclamation-delete`.
 - Audit log: `${REPORT_DIR:-/mnt/reports}/cleanup_run_YYYY-MM-DDTHHMMSSZ.log` (UTC), never overwritten; same lines to stdout.
 - Input: object key must start with `review/` and end with `.csv` (case-insensitive suffix); file read from `${REVIEW_DIR:-/mnt/review}/<key>` and must resolve inside `REVIEW_DIR`.

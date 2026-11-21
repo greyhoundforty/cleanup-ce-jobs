@@ -331,3 +331,11 @@ def test_lookup_of_other_resource_fails(stub):
     ev = go(rows(("yes", asked)), dry_run=False)
     assert ev[0].outcome == "FAILED"
     assert deletes(stub) == []
+
+
+def test_yes_and_no_for_same_crn_is_skipped(stub):
+    project_scenario(stub)
+    ev = go(rows(("yes", project_crn(PROJ)), ("no", project_crn(PROJ))), dry_run=False)
+    assert [e.outcome for e in ev] == ["SKIP_CONFLICT"]
+    assert "marked both yes and no" in ev[0].reason
+    assert stub.calls() == []

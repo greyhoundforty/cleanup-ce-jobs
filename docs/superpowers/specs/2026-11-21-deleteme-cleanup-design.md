@@ -109,7 +109,8 @@ the two tags are a second, independent check made on the live resource at delete
      `SKIP_UNSUPPORTED`; v1 only removes them through their VPC's cascade.
    - **Anything else** → `SKIP_UNSUPPORTED`.
 7. The whole CSV is read before anything is deleted, so a child row's explicit `no` is known
-   whatever the row order. A CRN listed twice is acted on once; a later attempt that finds it
+   whatever the row order. A CRN marked `yes` on one row and `no` on another →
+   `SKIP_CONFLICT`, nothing done (user decision 2026-11-21). A CRN listed twice is acted on once; a later attempt that finds it
    gone logs `ALREADY_GONE`.
 
 ### Protected resources
@@ -139,7 +140,7 @@ the two tags are a second, independent check made on the live resource at delete
 - `/mnt/reports/cleanup_run_YYYY-MM-DDTHHMMSSZ.log` (one per run, never overwritten).
 - First lines: mode (DRY RUN / LIVE), input file, row counts. Then one line per action:
   UTC timestamp, outcome (`DELETED`, `WOULD_DELETE`, `ALREADY_GONE`, `SKIP_TAGS`,
-  `SKIP_PROTECTED`, `SKIP_CHILD`, `SKIP_UNSUPPORTED`, `SKIP_NO_CRN`, `FAILED`), type, name, CRN and reason.
+  `SKIP_PROTECTED`, `SKIP_CHILD`, `SKIP_UNSUPPORTED`, `SKIP_NO_CRN`, `SKIP_CONFLICT`, `FAILED`), type, name, CRN and reason.
   Last line: summary counts.
 - The same lines go to stdout so `ibmcloud ce jobrun logs` shows them.
 - Failure on one row is logged as `FAILED` with the CLI's error text, and the run continues.

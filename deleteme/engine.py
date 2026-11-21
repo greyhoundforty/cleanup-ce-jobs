@@ -16,6 +16,7 @@ SKIP_PROTECTED = "SKIP_PROTECTED"
 SKIP_CHILD = "SKIP_CHILD"
 SKIP_UNSUPPORTED = "SKIP_UNSUPPORTED"
 SKIP_NO_CRN = "SKIP_NO_CRN"
+SKIP_CONFLICT = "SKIP_CONFLICT"
 FAILED = "FAILED"
 OUTCOMES = (
     DELETED,
@@ -26,6 +27,7 @@ OUTCOMES = (
     SKIP_CHILD,
     SKIP_UNSUPPORTED,
     SKIP_NO_CRN,
+    SKIP_CONFLICT,
     FAILED,
 )
 
@@ -234,5 +236,9 @@ def run(
         if key in seen:
             continue
         seen.add(key)
+        if key in explicit_no:
+            reason = "marked both yes and no in the CSV"
+            r.emit(SKIP_CONFLICT, row.type, row.name, row.crn, reason)
+            continue
         r.row(row, explicit_no)
     return r.events
