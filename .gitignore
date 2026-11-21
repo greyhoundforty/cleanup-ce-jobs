@@ -1,3 +1,8 @@
 # Local deploy settings (contain secrets)
 .env.deploy
 .env
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/

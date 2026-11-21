@@ -7,15 +7,21 @@ Repo: `greyhoundforty/cleanup-ce-jobs` (origin, branch `main`).
 ## Layout
 - `weekly_cleanup_report.sh`: one search, writes `cleanup_report_YYYY-MM-DD.txt|.json|.csv` to `${REPORT_DIR:-/mnt/reports}` (all-or-nothing; empty runs write `[]`, header-only CSV, "No resources found" text)
 - `entrypoint.sh`: validates `IBMCLOUD_API_KEY`, `ibmcloud login`, then execs the report script
-- `Dockerfile`: ubuntu:24.04 + jq + IBM Cloud CLI; copies both scripts
-- `deploy.sh`: idempotent create/update of secret, job and cron subscription
-- `tests/test_report.sh`, `tests/test_deploy.sh`, `tests/test_entrypoint.sh`: shell tests using a stubbed `ibmcloud`
-- `docs/superpowers/specs|plans/`: designs and plans (PDS mount: done; JSON/CSV report: done)
+- `deleteme_cleanup.py` + `deleteme/` (csvin, protect, cloud, engine): issue #2 cleanup job (Python 3.12 stdlib, shells out to `ibmcloud`); run via `CLEANUP_SCRIPT=/opt/cleanup/deleteme_cleanup.py`
+- `Dockerfile`: ubuntu:24.04 + jq + python3 + IBM Cloud CLI; copies the report script, entrypoint and the deleteme package
+- `deploy.sh`: idempotent create/update of secret, job and cron subscription (report job)
+- `deploy_deleteme.sh`: idempotent create/update of the `deleteme-cleanup` job, its secret, review PDS and COS subscription
+- `tests/test_report.sh`, `tests/test_deploy.sh`, `tests/test_entrypoint.sh`, `tests/test_deploy_deleteme.sh`: shell tests using a stubbed `ibmcloud`
+- `tests/test_*.py`: pytest for the deleteme job; `tests/stub/ibmcloud` answers from fixture JSON and records calls
+- `docs/superpowers/specs|plans/`: designs and plans (PDS mount, JSON/CSV report: done; deleteme cleanup: in progress)
+- `docs/test-resources.md`: tagged ce-test-* resources in ca-tor for exercising the cleanup job
 
 ## Run the tests
 ```bash
-bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entrypoint.sh
+bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entrypoint.sh && bash tests/test_deploy_deleteme.sh
+uvx --python 3.12 pytest tests -q && ruff check deleteme deleteme_cleanup.py tests && ruff format --check deleteme deleteme_cleanup.py tests
 ```
+pytest is not installed locally; `uvx --python 3.12` matches the image's Python (plain `uvx` picks an older one).
 `shellcheck` is not installed locally; use `bash -n` plus review (or install it).
 
 ## Deployed state (as of 2026-11-21)
@@ -29,6 +35,7 @@ bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entryp
 - Build: `docker build --platform linux/amd64 -t ca.icr.io/rst-icr-ca/weekly-cleanup:vN .` then `docker push` (push via `ca.icr.io`; `private.ca.icr.io` is only reachable inside IBM Cloud, but the job pulls from it).
 - Deploy: the user keeps `.env.deploy` (git-ignored, mode 600; template `.env.deploy.example`). Never read or print it. Run
   `set -a; . ./.env.deploy; set +a; ./deploy.sh` (override `IMAGE=...` inline if the file lags behind).
+- deleteme job: `set -a; . ./.env.deploy; set +a; ./deploy_deleteme.sh` (needs the `DELETEME_*`/`REVIEW_*` vars; deploys `DRY_RUN=true` unless `DELETEME_DRY_RUN=false`).
 - Inspect the mount without COS CLI config: `ibmcloud ce jobrun submit --job weekly-cleanup --name <n> --command /bin/sh --argument -c --argument 'ls -la /mnt/reports'`.
 
 ## Gotchas learned the hard way
@@ -55,18 +62,19 @@ CSV contract issue #2 will read: unquoted header
 quoted via `@csv`; `delete` generated as `no`; `tags` joined with `;`; missing fields empty; key is `crn`.
 
 
-## Backlog: delete resources tagged `deleteme` (issue #2)
+## deleteme cleanup job (issue #2)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
 
-Not started; needs brainstorming and an approved design first (it is destructive). Open
-questions are listed in the issue: exact tag form, whether to also require `owner:ryantiffany`,
-dry-run by default, resource types and deletion order, reclaim vs permanent delete, same job vs
-separate job, audit log, and the broader IAM access the API key would need.
+Status (2026-11-21): **implemented on branch `feat/deleteme-cleanup`**, not deployed (spec
+`docs/superpowers/specs/2026-11-21-deleteme-cleanup-design.md`, plan
+`docs/superpowers/plans/2026-11-21-deleteme-cleanup.md`). Rollout (plan Task 6) waits on the user
+creating the review bucket, HMAC secret, service ID/key and Notifications Manager authorization.
 
-Notes from the #1 final review the #2 reader must handle:
-- Re-check `deleteme` + `owner:ryantiffany` on the live resource; the CSV `tags` column is an editable snapshot.
-- Use a real CSV parser (names could contain newlines/commas/quotes); tolerate CRLF and a BOM (Excel re-saves).
-- Skip rows with an empty `crn`; consider spreadsheet formula-injection when values start with `= + - @`.
+Safety rules (do not weaken): delete only `yes` rows whose LIVE resource has both `deleteme` and
+`owner:ryantiffany`, is not protected (built-in: `rst-ce-demo`, `rst-cos-instance`; plus
+`CE_PROJECT_ID` and `PROTECTED_CRNS`), and only when `DRY_RUN` is exactly `false`. VPC `yes`
+cascades only through subnets/gateways that carry both tags; any untagged, protected, `no`-marked
+child or attached resource blocks the whole VPC. Service instances go to reclamation.
 
 ## Deferred minors (from final review)
 - Deferred minors from the #1 review (M1-M8) are listed in PR #3

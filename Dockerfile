@@ -3,11 +3,12 @@ FROM ubuntu:24.04
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies: curl, jq, and ca-certificates
+# Install dependencies: curl, jq, ca-certificates, and python3 (deleteme cleanup job)
 RUN apt-get update && apt-get install -y \
     curl \
     jq \
     ca-certificates \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install IBM Cloud CLI
@@ -17,6 +18,11 @@ RUN curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
 # Copy the cleanup script into the image
 COPY weekly_cleanup_report.sh /usr/local/bin/weekly_cleanup_report.sh
 RUN chmod +x /usr/local/bin/weekly_cleanup_report.sh
+
+# deleteme cleanup job (issue #2); runs with CLEANUP_SCRIPT=/opt/cleanup/deleteme_cleanup.py
+COPY deleteme /opt/cleanup/deleteme
+COPY deleteme_cleanup.py /opt/cleanup/deleteme_cleanup.py
+RUN chmod +x /opt/cleanup/deleteme_cleanup.py
 
 # Set the working directory
 WORKDIR /home/app
