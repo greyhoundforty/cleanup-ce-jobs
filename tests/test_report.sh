@@ -80,15 +80,37 @@ test_unwritable_dir_fails() {
     fi
 }
 
-test_no_results_leaves_no_file() {
+test_empty_result_writes_empty_reports() {
     local dir="$TMP/t4"
     mkdir -p "$dir"
     make_stub '{"items":[]}' 0
     run_script "$dir"
-    if [ "$RC" -eq 0 ] && [ -z "$(ls -A "$dir")" ]; then
-        check no_results_leaves_no_file ok
+    local t j c
+    t=$(report "$dir" txt); j=$(report "$dir" json); c=$(report "$dir" csv)
+    if [ "$RC" -eq 0 ] && [ -n "$t" ] && [ -n "$j" ] && [ -n "$c" ] \
+        && [ "$(jq -c . "$j")" = '[]' ] \
+        && [ "$(cat "$c")" = "$CSV_HEADER" ] \
+        && [ "$(cat "$t")" = 'No resources found with tag owner:ryantiffany.' ] \
+        && ! ls "$dir"/*.tmp >/dev/null 2>&1; then
+        check empty_result_writes_empty_reports ok
     else
-        check no_results_leaves_no_file fail
+        check empty_result_writes_empty_reports fail
+    fi
+}
+
+test_empty_rerun_replaces_earlier_report() {
+    local dir="$TMP/t13"
+    mkdir -p "$dir"
+    make_stub "$ITEMS" 0
+    run_script "$dir"
+    make_stub '{"items":[]}' 0
+    run_script "$dir"
+    local t c
+    t=$(report "$dir" txt); c=$(report "$dir" csv)
+    if [ "$RC" -eq 0 ] && [ "$(wc -l < "$c" | tr -d ' ')" = 1 ] && grep -q 'No resources found' "$t"; then
+        check empty_rerun_replaces_earlier_report ok
+    else
+        check empty_rerun_replaces_earlier_report fail
     fi
 }
 
@@ -222,7 +244,7 @@ test_rerun_replaces_all_three() {
 test_writes_report_in_report_dir
 test_creates_missing_dir
 test_unwritable_dir_fails
-test_no_results_leaves_no_file
+test_empty_result_writes_empty_reports
 test_search_failure_fails
 test_failed_rerun_keeps_existing_report
 test_default_dir_requires_mount
@@ -231,6 +253,7 @@ test_csv_header_and_rows
 test_json_matches_items
 test_non_json_output_fails
 test_rerun_replaces_all_three
+test_empty_rerun_replaces_earlier_report
 
 echo "${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

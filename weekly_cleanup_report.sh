@@ -43,15 +43,17 @@ if ! ibmcloud resource search "tags:\"${TAG}\"" --output json > "$SEARCH_TMP" \
     exit 1
 fi
 
+# An empty result still writes all three files ([] JSON, header-only CSV and a
+# "No resources found" text line), so "ran and found nothing" is distinguishable
+# from "did not run".
 if [ "$(jq '.items | length' "$SEARCH_TMP")" -eq 0 ]; then
     echo "No resources found with tag ${TAG}."
-    cleanup_tmp
-    exit 0
 fi
 
 # Render all formats to temp files; only move them into place if every one
 # succeeds, so a failure never leaves a partial set or clobbers an earlier report.
-if ! { jq -r '.items[] | "\(.name) | \(.region) | \(.service_name) | \(.crn)"' "$SEARCH_TMP" > "${TXT_FILE}.tmp" \
+if ! { jq -r --arg tag "$TAG" 'if (.items | length) == 0 then "No resources found with tag \($tag)."
+            else .items[] | "\(.name) | \(.region) | \(.service_name) | \(.crn)" end' "$SEARCH_TMP" > "${TXT_FILE}.tmp" \
     && jq '.items' "$SEARCH_TMP" > "${JSON_FILE}.tmp" \
     && printf '%s\n' "$CSV_HEADER" > "${CSV_FILE}.tmp" \
     && jq -r '.items[] | ["no", .name, .service_name, .type, .region, .resource_group_id,
