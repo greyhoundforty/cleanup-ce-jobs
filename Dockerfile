@@ -15,6 +15,11 @@ RUN apt-get update && apt-get install -y \
 # The installer puts the binary in /usr/local/bin/ibmcloud by default
 RUN curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
 
+# VPC commands (`ibmcloud is ...`) for the deleteme cleanup job; the installer
+# does not include this plugin.
+RUN ibmcloud plugin install vpc-infrastructure -f -q \
+    && ibmcloud plugin show vpc-infrastructure >/dev/null
+
 # Copy the cleanup script into the image
 COPY weekly_cleanup_report.sh /usr/local/bin/weekly_cleanup_report.sh
 RUN chmod +x /usr/local/bin/weekly_cleanup_report.sh
