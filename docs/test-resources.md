@@ -1,5 +1,18 @@
 # Test resources for the `deleteme` cleanup job (issue #2)
 
+## Live test, 2026-11-21 (jobrun `deleteme-live-1`, image v8, `DRY_RUN=false` on that run only)
+
+| Resource | Outcome | State after |
+|---|---|---|
+| `ce-test-vpc-a`, `ce-test-a-sn`, `ce-test-a-pgw` | `DELETED` (detach → subnet → gateway → VPC) | gone; recreate with the commands below |
+| `ce-test-proj` | `DELETED` to reclamation | in reclamation (7 days); restore with `ibmcloud resource reclamation-restore <id>` |
+| `ce-test-vpc-b` | `SKIP_TAGS` (no `deleteme`) | still there |
+| `ce-test-vpc-c` | `SKIP_TAGS` (no `owner:ryantiffany`) | still there |
+| `ce-test-vpc-d` | `SKIP_CHILD` (`ce-test-d-sn` lacks `deleteme`) | still there |
+| `ce-test-d-sn` | `SKIP_TAGS` | still there |
+
+The original inventory follows.
+
 Created 2026-11-21 in ca-tor, resource group `cloud-techsales`, zone `ca-tor-1`.
 No VMs and no data. The public gateway comes with an auto-created floating IP (search shows it as
 `ce-test-a-pgw`, type `floating-ip`, untagged), which is released when the gateway is deleted.

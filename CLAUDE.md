@@ -65,10 +65,16 @@ quoted via `@csv`; `delete` generated as `no`; `tags` joined with `;`; missing f
 ## deleteme cleanup job (issue #2)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
 
-Status (2026-11-21): **implemented on branch `feat/deleteme-cleanup`**, not deployed (spec
-`docs/superpowers/specs/2026-11-21-deleteme-cleanup-design.md`, plan
-`docs/superpowers/plans/2026-11-21-deleteme-cleanup.md`). Rollout (plan Task 6) waits on the user
-creating the review bucket, HMAC secret, service ID/key and Notifications Manager authorization.
+Status (2026-11-21): **implemented on branch `feat/deleteme-cleanup`, deployed in dry-run mode**
+(spec `docs/superpowers/specs/2026-11-21-deleteme-cleanup-design.md`, plan
+`docs/superpowers/plans/2026-11-21-deleteme-cleanup.md`). Job `deleteme-cleanup` runs image
+`private.ca.icr.io/rst-icr-ca/weekly-cleanup:v8` with `DRY_RUN=true`, retry limit 0, triggered by
+`deleteme-cleanup-cos` on `rst-cleanup-bucket-9yk456iwqnolk6p` (in `rst-cos-instance`), keys
+`review/*.csv`. Verified: event probe, dry run, and one live run (`deleteme-live-1`) against the
+ce-test-* resources; results in `docs/test-resources.md`.
+- Uploads must go under `review/` (top-level files are ignored by design).
+- The image needs the `vpc-infrastructure` CLI plugin (v6/v7 lacked it; do not use them).
+- Live run without flipping the job: `ibmcloud ce jobrun submit --job deleteme-cleanup --env DRY_RUN=false --env CSV_FILE=/mnt/review/review/<file>.csv`.
 
 Safety rules (do not weaken): delete only `yes` rows whose LIVE resource has both `deleteme` and
 `owner:ryantiffany`, is not protected (built-in: `rst-ce-demo`, `rst-cos-instance`; plus
