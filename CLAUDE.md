@@ -21,15 +21,21 @@ bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entryp
 ## Deployed state (as of 2026-11-21)
 - Project `rst-ce-demo`, job `weekly-cleanup`, cron `weekly-cleanup-cron` (`0 13 * * 1` UTC)
 - PDS `ce-pds-9ef3` -> bucket `rst-usage-bucket-9yk456iwqnolk6p` (ca-tor), mounted at `/mnt/reports` with subpath `cleanup`
-- Job runs image `private.ca.icr.io/rst-icr-ca/weekly-cleanup:v3` (v3 predates the entrypoint fix; not yet rebuilt)
+- Job runs image `private.ca.icr.io/rst-icr-ca/weekly-cleanup:v5` (JSON/CSV report + login region fix). v4 is broken (login region prompt); do not use.
 - Secrets: `cleanup-api-key` (job env `IBMCLOUD_API_KEY`), registry secret `ca-rst-icr-key`
-- A test jobrun succeeded and wrote `/mnt/reports/cleanup_report_<date>.txt`; the file in the bucket under `cleanup/` has NOT been confirmed from here (local `ibmcloud cos` plugin has no CRN configured)
+- Verified with jobrun `cleanup-v5-test-1` plus a `--command` listing run: txt/json/csv written to `/mnt/reports`, same-day `mv -f` overwrite works on the PDS, so the PDS credential can write.
+
+## Build and deploy
+- Build: `docker build --platform linux/amd64 -t ca.icr.io/rst-icr-ca/weekly-cleanup:vN .` then `docker push` (push via `ca.icr.io`; `private.ca.icr.io` is only reachable inside IBM Cloud, but the job pulls from it).
+- Deploy: the user keeps `.env.deploy` (git-ignored, mode 600; template `.env.deploy.example`). Never read or print it. Run
+  `set -a; . ./.env.deploy; set +a; ./deploy.sh` (override `IMAGE=...` inline if the file lags behind).
+- Inspect the mount without COS CLI config: `ibmcloud ce jobrun submit --job weekly-cleanup --name <n> --command /bin/sh --argument -c --argument 'ls -la /mnt/reports'`.
 
 ## Gotchas learned the hard way
 - Registry host: the registry secret is for `private.ca.icr.io`. Using `ca.icr.io` gives a 401 on pull. `ca-tor.icr.io` does not exist. Build for `--platform linux/amd64`.
 - `--mount-data-store` subpath must NOT start with `/` (`ce-pds-9ef3:cleanup`).
 - `job update` mount/secret flags are add-only and fail as duplicates; `deploy.sh` checks the live job and adds only what is missing.
-- `ibmcloud login` has no `--non-interactive` flag; `--apikey ... -q` is already non-interactive.
+- `ibmcloud login` has no `--non-interactive` flag, and `--apikey ... -q` still prompts for a region (EOF in a job) unless given `-r REGION` or `--no-region`; `entrypoint.sh` uses `IBMCLOUD_REGION`, else `CE_REGION`, else `--no-region`.
 - Never print `ibmcloud ce registry get` output: it includes the encoded credentials (the key behind `ca-rst-icr-key` leaked into a session once; user is rotating it and will move to a new secret name, which means changing `SECRET_NAME` in `deploy.sh` and the `REGISTRY_SECRET` env var).
 - Default `REPORT_DIR` must be a real mount (`/proc/mounts` check) so reports are never silently written to ephemeral storage.
 
@@ -38,7 +44,7 @@ https://github.com/greyhoundforty/cleanup-ce-jobs/issues/1
 
 Status (2026-11-21): **implemented on branch `feat/json-csv-report`** (spec
 `docs/superpowers/specs/2026-11-21-json-csv-report-design.md`, plan
-`docs/superpowers/plans/2026-11-21-json-csv-report.md`). Not yet merged, built or deployed as v4.
+`docs/superpowers/plans/2026-11-21-json-csv-report.md`). Merged (PR #3); deployed as v5.
 
 Why (drives the CSV contract): the CSV is a review sheet. The user edits it the day before
 cleanup (sets `delete` to `yes`), uploads it to a separate bucket, and issue #2's cleanup job
@@ -48,7 +54,6 @@ CSV contract issue #2 will read: unquoted header
 `delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn`; data rows fully
 quoted via `@csv`; `delete` generated as `no`; `tags` joined with `;`; missing fields empty; key is `crn`.
 
-Ships as image v4 together with the entrypoint fix already on `main` (commit `43fd5fe`). The user chose to hold v4 until this work is done.
 
 ## Backlog: delete resources tagged `deleteme` (issue #2)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
@@ -64,5 +69,4 @@ Notes from the #1 final review the #2 reader must handle:
 - Skip rows with an empty `crn`; consider spreadsheet formula-injection when values start with `= + - @`.
 
 ## Deferred minors (from final review)
-- PDS credential's COS role (needs Writer) has not been verified
-- `deploy.sh` has not been run end to end since the cron/env-file/env-rm changes (tests use a stub)
+- Deferred minors from the #1 review (M1-M8) are listed in PR #3
