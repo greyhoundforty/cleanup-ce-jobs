@@ -5,12 +5,12 @@ and writes a report to a persistent data store (PDS) mount backed by COS.
 Repo: `greyhoundforty/cleanup-ce-jobs` (origin, branch `main`).
 
 ## Layout
-- `weekly_cleanup_report.sh`: search + write report to `${REPORT_DIR:-/mnt/reports}`
+- `weekly_cleanup_report.sh`: one search, writes `cleanup_report_YYYY-MM-DD.txt|.json|.csv` to `${REPORT_DIR:-/mnt/reports}` (all-or-nothing; empty runs write `[]`, header-only CSV, "No resources found" text)
 - `entrypoint.sh`: validates `IBMCLOUD_API_KEY`, `ibmcloud login`, then execs the report script
 - `Dockerfile`: ubuntu:24.04 + jq + IBM Cloud CLI; copies both scripts
 - `deploy.sh`: idempotent create/update of secret, job and cron subscription
 - `tests/test_report.sh`, `tests/test_deploy.sh`, `tests/test_entrypoint.sh`: shell tests using a stubbed `ibmcloud`
-- `docs/superpowers/specs|plans/`: design and plan for the PDS-mount work (done)
+- `docs/superpowers/specs|plans/`: designs and plans (PDS mount: done; JSON/CSV report: done)
 
 ## Run the tests
 ```bash
@@ -33,22 +33,20 @@ bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entryp
 - Never print `ibmcloud ce registry get` output: it includes the encoded credentials (the key behind `ca-rst-icr-key` leaked into a session once; user is rotating it and will move to a new secret name, which means changing `SECRET_NAME` in `deploy.sh` and the `REGISTRY_SECRET` env var).
 - Default `REPORT_DIR` must be a real mount (`/proc/mounts` check) so reports are never silently written to ephemeral storage.
 
-## In progress: JSON + CSV report (issue #1)
+## JSON + CSV report (issue #1)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/1
 
-Status (2026-11-21): **design approved, plan signed off by the user, ready to implement.**
-- Spec: `docs/superpowers/specs/2026-11-21-json-csv-report-design.md`
-- Plan: `docs/superpowers/plans/2026-11-21-json-csv-report.md` (2 tasks, TDD)
-- Execution method chosen: **Native** — Claude implements both tasks itself in-session
-  (use `superpowers:executing-plans`), then one fresh reviewer checks the whole branch at the end.
-  Do not re-ask the plan approval or the execution method.
-- Next step: start Task 1.
+Status (2026-11-21): **implemented on branch `feat/json-csv-report`** (spec
+`docs/superpowers/specs/2026-11-21-json-csv-report-design.md`, plan
+`docs/superpowers/plans/2026-11-21-json-csv-report.md`). Not yet merged, built or deployed as v4.
 
 Why (drives the CSV contract): the CSV is a review sheet. The user edits it the day before
 cleanup (sets `delete` to `yes`), uploads it to a separate bucket, and issue #2's cleanup job
 triggers on that upload and deletes only rows marked `yes` AND tagged both `deleteme` and
 `owner:ryantiffany`. The JSON is for the user's own tracking (maybe a future review file).
-CSV columns: `delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn`.
+CSV contract issue #2 will read: unquoted header
+`delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn`; data rows fully
+quoted via `@csv`; `delete` generated as `no`; `tags` joined with `;`; missing fields empty; key is `crn`.
 
 Ships as image v4 together with the entrypoint fix already on `main` (commit `43fd5fe`). The user chose to hold v4 until this work is done.
 
@@ -58,9 +56,13 @@ https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
 Not started; needs brainstorming and an approved design first (it is destructive). Open
 questions are listed in the issue: exact tag form, whether to also require `owner:ryantiffany`,
 dry-run by default, resource types and deletion order, reclaim vs permanent delete, same job vs
-separate job, audit log, and the broader IAM access the API key would need. Do #1 first.
+separate job, audit log, and the broader IAM access the API key would need.
+
+Notes from the #1 final review the #2 reader must handle:
+- Re-check `deleteme` + `owner:ryantiffany` on the live resource; the CSV `tags` column is an editable snapshot.
+- Use a real CSV parser (names could contain newlines/commas/quotes); tolerate CRLF and a BOM (Excel re-saves).
+- Skip rows with an empty `crn`; consider spreadsheet formula-injection when values start with `= + - @`.
 
 ## Deferred minors (from final review)
-- A report write failure is reported as "resource search failed" (`weekly_cleanup_report.sh`); probe-write the directory instead
 - PDS credential's COS role (needs Writer) has not been verified
 - `deploy.sh` has not been run end to end since the cron/env-file/env-rm changes (tests use a stub)
