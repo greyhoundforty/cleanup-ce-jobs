@@ -56,7 +56,12 @@ https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
 Not started; needs brainstorming and an approved design first (it is destructive). Open
 questions are listed in the issue: exact tag form, whether to also require `owner:ryantiffany`,
 dry-run by default, resource types and deletion order, reclaim vs permanent delete, same job vs
-separate job, audit log, and the broader IAM access the API key would need. Do #1 first.
+separate job, audit log, and the broader IAM access the API key would need.
+
+Notes from the #1 final review the #2 reader must handle:
+- Re-check `deleteme` + `owner:ryantiffany` on the live resource; the CSV `tags` column is an editable snapshot.
+- Use a real CSV parser (names could contain newlines/commas/quotes); tolerate CRLF and a BOM (Excel re-saves).
+- Skip rows with an empty `crn`; consider spreadsheet formula-injection when values start with `= + - @`.
 
 ## Deferred minors (from final review)
 - PDS credential's COS role (needs Writer) has not been verified
