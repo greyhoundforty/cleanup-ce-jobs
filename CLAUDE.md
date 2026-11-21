@@ -36,17 +36,19 @@ bash tests/test_report.sh && bash tests/test_deploy.sh && bash tests/test_entryp
 ## In progress: JSON + CSV report (issue #1)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/1
 
-Status: **brainstorming, waiting on the user's answer.** No design doc, plan or code yet
-(the brainstorming gate applies: get the design approved, write the spec in
-`docs/superpowers/specs/`, then use `superpowers:writing-plans`).
+Status (2026-11-21): **design approved, plan signed off by the user, ready to implement.**
+- Spec: `docs/superpowers/specs/2026-11-21-json-csv-report-design.md`
+- Plan: `docs/superpowers/plans/2026-11-21-json-csv-report.md` (2 tasks, TDD)
+- Execution method chosen: **Native** — Claude implements both tasks itself in-session
+  (use `superpowers:executing-plans`), then one fresh reviewer checks the whole branch at the end.
+  Do not re-ask the plan approval or the execution method.
+- Next step: start Task 1.
 
-What is known:
-- Current report: `name | region | service | crn`, built with `jq` from one `ibmcloud resource search` call.
-- Search items also have `type`, `resource_group_id`, `creation_date`, `modification_date`, `tags`, `access_tags`, `service_tags`, `family`, `provider`, `resource_id`. Resource types seen: `key`, `resource-instance`, `vpc`.
-- Draft approach (proposal only): one search, render txt/JSON/CSV with `jq` (`@csv`, header row), write all three to temp files and `mv` into place only if all succeed.
-
-Open question asked of the user (unanswered): what reads these files and which fields/columns it needs.
-Also unsettled: keep the text report or replace it; empty-run behavior (`[]` / header-only CSV vs no file).
+Why (drives the CSV contract): the CSV is a review sheet. The user edits it the day before
+cleanup (sets `delete` to `yes`), uploads it to a separate bucket, and issue #2's cleanup job
+triggers on that upload and deletes only rows marked `yes` AND tagged both `deleteme` and
+`owner:ryantiffany`. The JSON is for the user's own tracking (maybe a future review file).
+CSV columns: `delete,name,service_name,type,region,resource_group_id,creation_date,tags,crn`.
 
 Ships as image v4 together with the entrypoint fix already on `main` (commit `43fd5fe`). The user chose to hold v4 until this work is done.
 
