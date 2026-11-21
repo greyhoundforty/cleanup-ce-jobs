@@ -105,8 +105,11 @@ the two tags are a second, independent check made on the live resource at delete
    - **Service instance** (`resource-instance`, including a Code Engine project):
      `ibmcloud resource service-instance-delete <id> --recursive -f`. It goes into IBM's
      reclamation (7 days by default), never `reclamation-delete`.
-   - **Subnet or public gateway on its own row** (marked `yes`, VPC not marked) →
-     `SKIP_UNSUPPORTED`; v1 only removes them through their VPC's cascade.
+   - **Subnet or public gateway on its own row** marked `yes`: no action of its own. The
+     report writes `no` on every row, and a child's `no` blocks its VPC, so the user marks the
+     VPC **and** its children `yes` (user decision 2026-11-21). The child's line comes from
+     its VPC's cascade; if that cascade did not delete it, the row is reported at the end as
+     `SKIP_UNSUPPORTED` ("only deleted with their VPC").
    - **Anything else** → `SKIP_UNSUPPORTED`.
 7. The whole CSV is read before anything is deleted, so a child row's explicit `no` is known
    whatever the row order. A CRN marked `yes` on one row and `no` on another →

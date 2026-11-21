@@ -76,6 +76,7 @@ Safety rules (do not weaken): delete only `yes` rows whose LIVE resource has bot
 cascades only through subnets/gateways that carry both tags; any untagged, protected, `no`-marked
 child or attached resource blocks the whole VPC. Service instances go to reclamation.
 A CRN marked `yes` on one row and `no` on another is skipped (`SKIP_CONFLICT`).
+The report writes `no` on every row, so to delete a VPC mark the VPC and its subnets/gateways `yes`.
 
 ## Deferred minors (from final review)
 - Deferred minors from the #1 review (M1-M8) are listed in PR #3

@@ -339,3 +339,21 @@ def test_yes_and_no_for_same_crn_is_skipped(stub):
     assert [e.outcome for e in ev] == ["SKIP_CONFLICT"]
     assert "marked both yes and no" in ev[0].reason
     assert stub.calls() == []
+
+
+def test_child_rows_marked_yes_are_covered_by_vpc_cascade(stub):
+    vpc_scenario(stub)
+    rs = rows(("yes", subnet_crn(SN)), ("yes", pgw_crn(GW)), ("yes", vpc_crn(VPC)))
+    ev = go(rs, dry_run=True)
+    assert outcomes(ev) == [
+        ("WOULD_DELETE", "a-sn"),
+        ("WOULD_DELETE", "a-pgw"),
+        ("WOULD_DELETE", "vpc-a"),
+    ]
+
+
+def test_child_row_of_skipped_vpc_says_why(stub):
+    vpc_scenario(stub, gw_tags=["owner:ryantiffany"])
+    ev = go(rows(("yes", subnet_crn(SN)), ("yes", vpc_crn(VPC))), dry_run=True)
+    assert [e.outcome for e in ev] == ["SKIP_CHILD", "SKIP_UNSUPPORTED"]
+    assert ev[1].name == "a-sn" and "only deleted with their VPC" in ev[1].reason

@@ -57,9 +57,13 @@ class _Run:
         self.poll = poll
         self.events: list[Event] = []
         self._emit = emit
+        self.child_rows: list[Resource] = []  # subnet/gateway rows marked yes
+        self.handled: set = set()  # keys this run deleted, would delete, or found gone
 
     def emit(self, outcome, type_, name, crn, reason=""):
         ev = Event(outcome, type_, name, crn, reason)
+        if outcome in (DELETED, WOULD_DELETE, ALREADY_GONE) and crn:
+            self.handled.add(crn_key(crn))
         self.events.append(ev)
         self._emit(ev)
 
@@ -96,6 +100,9 @@ class _Run:
             self.vpc(res, explicit_no)
         elif res.type == "resource-instance":
             self.service(res)
+        elif res.type in ("subnet", "public-gateway"):
+            # Deleted only through their VPC's cascade; reported at the end if it did not.
+            self.child_rows.append(res)
         else:
             self.emit(
                 SKIP_UNSUPPORTED,
@@ -241,4 +248,9 @@ def run(
             r.emit(SKIP_CONFLICT, row.type, row.name, row.crn, reason)
             continue
         r.row(row, explicit_no)
+    for res in r.child_rows:
+        if crn_key(res.crn) not in r.handled:
+            reason = "subnets and public gateways are only deleted with their VPC, "
+            reason += "which this run did not delete"
+            r.emit(SKIP_UNSUPPORTED, res.type, res.name, res.crn, reason)
     return r.events
