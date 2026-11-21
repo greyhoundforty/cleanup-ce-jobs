@@ -11,7 +11,16 @@ if [ -z "${IBMCLOUD_API_KEY:-}" ]; then
     exit 1
 fi
 
-if ! LOGIN_OUTPUT=$(ibmcloud login --apikey "$IBMCLOUD_API_KEY" -q 2>&1); then
+# Without -r or --no-region, `ibmcloud login` prompts for a region and fails
+# with EOF in a job. Code Engine sets CE_REGION; IBMCLOUD_REGION overrides it.
+REGION="${IBMCLOUD_REGION:-${CE_REGION:-}}"
+if [ -n "$REGION" ]; then
+    REGION_ARGS=(-r "$REGION")
+else
+    REGION_ARGS=(--no-region)
+fi
+
+if ! LOGIN_OUTPUT=$(ibmcloud login --apikey "$IBMCLOUD_API_KEY" "${REGION_ARGS[@]}" -q 2>&1); then
     echo "ERROR: ibmcloud login failed:" >&2
     echo "${LOGIN_OUTPUT//$IBMCLOUD_API_KEY/[redacted]}" >&2
     exit 1
