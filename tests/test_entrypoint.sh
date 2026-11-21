@@ -88,11 +88,41 @@ test_api_key_not_echoed() {
     fi
 }
 
+test_login_targets_ce_region() {
+    run_entrypoint IBMCLOUD_API_KEY=good-key-123 CE_REGION=ca-tor
+    if [ "$RC" -eq 0 ] && grep -q '^login .* -r ca-tor' "$LOG"; then
+        check login_targets_ce_region ok
+    else
+        check login_targets_ce_region fail
+    fi
+}
+
+test_login_region_override() {
+    run_entrypoint IBMCLOUD_API_KEY=good-key-123 CE_REGION=ca-tor IBMCLOUD_REGION=us-south
+    if [ "$RC" -eq 0 ] && grep -q '^login .* -r us-south' "$LOG"; then
+        check login_region_override ok
+    else
+        check login_region_override fail
+    fi
+}
+
+test_login_without_region_env_skips_region() {
+    run_entrypoint IBMCLOUD_API_KEY=good-key-123
+    if [ "$RC" -eq 0 ] && grep -q '^login .*--no-region' "$LOG"; then
+        check login_without_region_env_skips_region ok
+    else
+        check login_without_region_env_skips_region fail
+    fi
+}
+
 test_login_failure_stops_with_message
 test_missing_api_key_stops_with_message
 test_login_then_runs_script
 test_script_exit_code_propagates
 test_api_key_not_echoed
+test_login_targets_ce_region
+test_login_region_override
+test_login_without_region_env_skips_region
 
 echo "${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
