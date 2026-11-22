@@ -13,8 +13,9 @@ Repo: `greyhoundforty/cleanup-ce-jobs` (origin, branch `main`).
 - `deploy_deleteme.sh`: idempotent create/update of the `deleteme-cleanup` job, its secret, review PDS and COS subscription
 - `tests/test_report.sh`, `tests/test_deploy.sh`, `tests/test_entrypoint.sh`, `tests/test_deploy_deleteme.sh`: shell tests using a stubbed `ibmcloud`
 - `tests/test_*.py`: pytest for the deleteme job; `tests/stub/ibmcloud` answers from fixture JSON and records calls
-- `docs/superpowers/specs|plans/`: designs and plans (PDS mount, JSON/CSV report: done; deleteme cleanup: in progress)
-- `docs/test-resources.md`: tagged ce-test-* resources in ca-tor for exercising the cleanup job
+- `docs/superpowers/specs|plans/`: designs and plans (PDS mount, JSON/CSV report: done; deleteme cleanup: done)
+- `docs/test-resources.md`: the ce-test-* resources used for the live test (torn down 2026-11-22) and how to recreate them
+- `README.md`: user-facing overview of both jobs
 
 ## Run the tests
 ```bash
@@ -27,7 +28,7 @@ pytest is not installed locally; `uvx --python 3.12` matches the image's Python 
 ## Deployed state (as of 2026-11-21)
 - Project `rst-ce-demo`, job `weekly-cleanup`, cron `weekly-cleanup-cron` (`0 13 * * 1` UTC)
 - PDS `ce-pds-9ef3` -> bucket `rst-usage-bucket-9yk456iwqnolk6p` (ca-tor), mounted at `/mnt/reports` with subpath `cleanup`
-- Job runs image `private.ca.icr.io/rst-icr-ca/weekly-cleanup:v5` (JSON/CSV report + login region fix). v4 is broken (login region prompt); do not use.
+- Job runs image `private.ca.icr.io/rst-icr-ca/weekly-cleanup:v5` (JSON/CSV report + login region fix). Registry holds only v5 and v8 (v3, v4, v6, v7 deleted 2026-11-22).
 - Secrets: `cleanup-api-key` (job env `IBMCLOUD_API_KEY`), registry secret `ca-rst-icr-key`
 - Verified with jobrun `cleanup-v5-test-1` plus a `--command` listing run: txt/json/csv written to `/mnt/reports`, same-day `mv -f` overwrite works on the PDS, so the PDS credential can write.
 
@@ -65,7 +66,7 @@ quoted via `@csv`; `delete` generated as `no`; `tags` joined with `;`; missing f
 ## deleteme cleanup job (issue #2)
 https://github.com/greyhoundforty/cleanup-ce-jobs/issues/2
 
-Status (2026-11-21): **implemented on branch `feat/deleteme-cleanup`, deployed in dry-run mode**
+Status (2026-11-22): **merged to `main`, issue closed, deployed in dry-run mode**
 (spec `docs/superpowers/specs/2026-11-21-deleteme-cleanup-design.md`, plan
 `docs/superpowers/plans/2026-11-21-deleteme-cleanup.md`). Job `deleteme-cleanup` runs image
 `private.ca.icr.io/rst-icr-ca/weekly-cleanup:v8` with `DRY_RUN=true`, retry limit 0, triggered by
