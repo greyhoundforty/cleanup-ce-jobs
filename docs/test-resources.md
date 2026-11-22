@@ -11,6 +11,10 @@
 | `ce-test-vpc-d` | `SKIP_CHILD` (`ce-test-d-sn` lacks `deleteme`) | still there |
 | `ce-test-d-sn` | `SKIP_TAGS` | still there |
 
+**Torn down 2026-11-22:** `ce-test-d-sn` and `ce-test-vpc-b/c/d` deleted by hand; no ce-test VPCs,
+subnets or floating IPs remain. `ce-test-proj` stays in reclamation until IBM purges it.
+To test again, recreate with the commands below.
+
 The original inventory follows.
 
 Created 2026-11-21 in ca-tor, resource group `cloud-techsales`, zone `ca-tor-1`.
